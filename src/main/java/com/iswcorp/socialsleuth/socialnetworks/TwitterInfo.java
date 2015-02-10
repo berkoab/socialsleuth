@@ -1,4 +1,4 @@
-package com.iswcorp.socialsleuth;
+package com.iswcorp.socialsleuth.socialnetworks;
 
 public class TwitterInfo {
 	private String username;

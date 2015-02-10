@@ -2,7 +2,8 @@ package com.iswcorp.socialsleuth;
 
 import java.util.List;
 
-import com.sappenin.ms.activitystrea.v1.Activity;
+import com.ibm.common.activitystreams.Activity;
+import com.iswcorp.socialsleuth.socialnetworks.TwitterInfo;
 
 public class QueryResults {
 	private List<String> usernames;
@@ -24,6 +25,6 @@ public class QueryResults {
 		return twitterInfos;
 	}
 	public String export() {
-		return null;
+		return activity.toString();
 	}
 }

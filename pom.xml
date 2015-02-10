@@ -4,10 +4,28 @@
   <artifactId>socialsleuth</artifactId>
   <version>0.0.1-SNAPSHOT</version>
   	<dependencies>
-	  	<dependency>
-	    <groupId>com.sappenin.ms.activitystrea</groupId>
-	    <artifactId>activitystrea.ms-model</artifactId>
-	    <version>1.0.2</version>
-		</dependency>
+	  	  <dependency>
+		    <groupId>com.ibm.common</groupId>
+		    <artifactId>activitystreams-core</artifactId>
+		    <version>0.0.1-SNAPSHOT</version>
+		  </dependency>
+		
+		  <dependency>
+		    <groupId>com.ibm.common</groupId>
+		    <artifactId>activitystreams-actions</artifactId>
+		    <version>0.0.1-SNAPSHOT</version>
+		  </dependency>
+		
+		  <dependency>
+		    <groupId>com.ibm.common</groupId>
+		    <artifactId>activitystreams-geo</artifactId>
+		    <version>0.0.1-SNAPSHOT</version>
+		  </dependency>
+		
+		  <dependency>
+		    <groupId>com.ibm.common</groupId>
+		    <artifactId>activitystreams-legacy</artifactId>
+		    <version>0.0.1-SNAPSHOT</version>
+		  </dependency>
   </dependencies>
 </project>
