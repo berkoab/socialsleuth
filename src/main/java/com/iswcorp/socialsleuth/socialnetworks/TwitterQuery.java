@@ -234,7 +234,11 @@ public class TwitterQuery {
 	}
 	
 	public static void main(String[] args) throws TwitterException, InterruptedException {
-		TwitterQuery tw = new TwitterQuery("Ravens", 3, "C://Development/myfile.txt", 10);
+		String startPoint = args[0];
+		int levels = Integer.valueOf(args[1]);
+		String fileName = args[2];
+		int count = Integer.valueOf(args[3]);
+		TwitterQuery tw = new TwitterQuery(startPoint, levels, fileName, count);
 		tw.run();
 	}
 
