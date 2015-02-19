@@ -44,11 +44,16 @@ public class TwitterQuery {
 			e1.printStackTrace();
 		}
 		RateLimitStatus status = statusMap.get(statusOf);
-		System.out.println("Rate Limit exceeded for " + statusOf + ". Sleeping for " + (status.getSecondsUntilReset()+10) + " seconds....");
-		try {
-			Thread.sleep((status.getSecondsUntilReset()+10)*1000);
-		} catch (InterruptedException e1) {
-			e1.printStackTrace();
+		int secondsUntilReset = status.getSecondsUntilReset()+15;
+		System.out.println("Rate Limit exceeded for " + statusOf + ". Sleeping for " + (secondsUntilReset) + " seconds....");
+		while(secondsUntilReset>0) {
+			try {
+				System.out.println("Sleeping for " + secondsUntilReset + " seconds....");
+				Thread.sleep(60*1000);
+			} catch (InterruptedException e1) {
+				e1.printStackTrace();
+			}
+			secondsUntilReset = secondsUntilReset - 60;
 		}
 	}
 	
@@ -173,7 +178,7 @@ public class TwitterQuery {
 		return user;
 	}
 	
-	private void processUser(TwitterUser user, int maxLevel, int level, int pages, int count) {
+	private void processUser(TwitterUser user, int maxLevel, int level, int pages, int count, String parent) {
 		this.addStatusesAndMentions(user, level);
 		try {
 			for(String status:user.getStatuses()) {	
@@ -185,15 +190,21 @@ public class TwitterQuery {
 		}
 		if(user.getLevel()<maxLevel) {
 			user.setFollowers(this.getFollowers(user.getUser().getScreenName(), pages, count));
-			user.setFriends(this.getFollowers(user.getUser().getScreenName(), pages, count));
+			user.setFriends(this.getFriends(user.getUser().getScreenName(), pages, count));
 			for(User follower:user.getFollowers()) {
-				processUser(new TwitterUser(follower), maxLevel, user.getLevel(), pages, count);
+				if(!follower.getScreenName().equals(parent)) {
+					processUser(new TwitterUser(follower), maxLevel, user.getLevel(), pages, count, user.getUser().getScreenName());
+				}
 			}
 			for(User friend:user.getFriends()) {
-				processUser(new TwitterUser(friend), maxLevel, user.getLevel(), pages, count);
+				if(!friend.getScreenName().equals(parent)) {
+					processUser(new TwitterUser(friend), maxLevel, user.getLevel(), pages, count, user.getUser().getScreenName());
+				}
 			}
 			for(String mention:user.getMentions()) {
-				processUser(this.createTwitterUser(mention), maxLevel, user.getLevel(), pages, count);
+				if(!mention.equals(parent)) {
+					processUser(this.createTwitterUser(mention), maxLevel, user.getLevel(), pages, count, user.getUser().getScreenName());
+				}
 			}
 		}
 	}
@@ -223,7 +234,7 @@ public class TwitterQuery {
 	
 	public void run() {
 		this.openWriter(this.fileName);
-		this.processUser(this.createTwitterUser(this.startingPoint), this.maxLevel, 0, 1, this.count);
+		this.processUser(this.createTwitterUser(this.startingPoint), this.maxLevel, 0, 1, this.count, "");
 		this.closeWriter();
 	}
 	
