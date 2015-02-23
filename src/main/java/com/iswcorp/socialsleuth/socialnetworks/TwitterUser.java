@@ -1,6 +1,8 @@
 package com.iswcorp.socialsleuth.socialnetworks;
 
 import java.util.ArrayList;
+
+import twitter4j.TwitterObjectFactory;
 import twitter4j.User;
 
 public class TwitterUser {
@@ -60,4 +62,7 @@ public class TwitterUser {
 		this.statuses = statuses;
 	}
 	
+	public String toString() {
+		return TwitterObjectFactory.getRawJSON(this.user);
+	}
 }
