@@ -71,11 +71,7 @@ public class TwitterQuery {
 				try {
 					usersResponse = twitter.getFollowersList(screenName, nextCursor, count);
 				} catch (TwitterException e) {
-					if(e.getErrorMessage().equals("Rate limit exceeded")) {
-						getStatus(e, "/followers/list");
-					} else {
-						e.printStackTrace();
-					}
+					getStatus(e, "/followers/list");
 				} finally {
 					a = false;
 				}
@@ -101,11 +97,7 @@ public class TwitterQuery {
 				try {
 					usersResponse = twitter.getFriendsList(screenName, nextCursor, count);
 				} catch (TwitterException e) {
-					if(e.getErrorMessage().equals("Rate limit exceeded")) {
-						getStatus(e, "/friends/list");
-					} else {
-						e.printStackTrace();
-					}
+					getStatus(e, "/friends/list");
 				} finally {
 					a = false;
 				}
@@ -183,7 +175,9 @@ public class TwitterQuery {
 	
 	private void write(BufferedWriter bw, User user) {
 		try {
-			bw.write(gson.toJson(user));
+			String json = gson.toJson(user);
+			System.out.println(json);
+			bw.write(json);
 			bw.newLine();
 			bw.flush();
 		} catch (IOException e) {
