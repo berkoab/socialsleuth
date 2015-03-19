@@ -1,7 +1,12 @@
 package com.iswcorp.socialsleuth.socialnetworks;
 
+import twitter4j.AsyncTwitter;
+import twitter4j.AsyncTwitterFactory;
+import twitter4j.Status;
 import twitter4j.Twitter;
+import twitter4j.TwitterAdapter;
 import twitter4j.TwitterFactory;
+import twitter4j.TwitterListener;
 import twitter4j.conf.ConfigurationBuilder;
 
 public abstract class TwitterAuth {
@@ -25,5 +30,20 @@ public abstract class TwitterAuth {
 			e.printStackTrace();
 		}
 		return twitter;
+	}
+	
+	public static AsyncTwitter createAsynchTwitter() {
+		TwitterListener listener = new TwitterAdapter() {
+	        @Override public void updatedStatus(Status status) {
+	          System.out.println("Successfully updated the status to [" +
+	                   status.getText() + "].");
+	        }
+	        
+	    };
+	    // The factory instance is re-useable and thread safe.
+	    AsyncTwitterFactory factory = new AsyncTwitterFactory();
+	    AsyncTwitter asyncTwitter = factory.getInstance();
+	    asyncTwitter.addListener(listener);
+		return asyncTwitter;
 	}
 }

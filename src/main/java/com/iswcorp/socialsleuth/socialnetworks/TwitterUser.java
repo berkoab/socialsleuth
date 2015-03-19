@@ -12,11 +12,17 @@ public class TwitterUser {
 	private ArrayList<String> statuses = new ArrayList<String>();
 	private ArrayList<String> mentions = new ArrayList<String>();
 	private int level;
+	private String pedigree = "";
 	
 	public TwitterUser() {}
 	
 	public TwitterUser(User user) {
 		this.user = user;
+	}
+	
+	public TwitterUser(User user, TwitterUser parent) {
+		this.user = user;
+		this.setPedigree(parent.getPedigree() + " <- " + this.user.getScreenName());
 	}
 	
 	public User getUser() {
@@ -64,5 +70,13 @@ public class TwitterUser {
 	
 	public String toString() {
 		return TwitterObjectFactory.getRawJSON(this.user);
+	}
+
+	public String getPedigree() {
+		return this.pedigree;
+	}
+
+	public void setPedigree(String pedigree) {
+		this.pedigree = pedigree;
 	}
 }

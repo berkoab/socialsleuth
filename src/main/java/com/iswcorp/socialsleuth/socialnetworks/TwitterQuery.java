@@ -9,13 +9,17 @@ import java.util.Map;
 
 import com.google.gson.Gson;
 
+import twitter4j.AsyncTwitter;
+import twitter4j.AsyncTwitterFactory;
 import twitter4j.HttpResponseCode;
 import twitter4j.PagableResponseList;
 import twitter4j.RateLimitStatus;
 import twitter4j.ResponseList;
 import twitter4j.Status;
 import twitter4j.Twitter;
+import twitter4j.TwitterAdapter;
 import twitter4j.TwitterException;
+import twitter4j.TwitterListener;
 import twitter4j.TwitterObjectFactory;
 import twitter4j.User;
 import twitter4j.UserMentionEntity;
@@ -51,7 +55,7 @@ public class TwitterQuery {
 		System.out.println("Rate Limit exceeded for " + statusOf + ". Sleeping for " + (secondsUntilReset) + " seconds....");
 		while(secondsUntilReset>0) {
 			try {
-				System.out.println("Sleeping for " + secondsUntilReset + " seconds....");
+				System.out.println("Sleeping for " + secondsUntilReset + " more seconds....");
 				Thread.sleep(60*1000);
 			} catch (InterruptedException e1) {
 				e1.printStackTrace();
@@ -135,12 +139,17 @@ public class TwitterQuery {
 		return statuses;
 	}
 	
-	private TwitterUser createTwitterUser(String screenName) {
+	private TwitterUser createTwitterUser(String screenName, String pedigree) {
 		TwitterUser twUser = new TwitterUser();
 		boolean a = true;
 		while(a) {
 			try {
 				twUser.setUser(this.twitter.showUser(screenName));
+				if(!pedigree.equals("")) {
+					twUser.setPedigree(pedigree + " <- " + screenName);
+				} else {
+					twUser.setPedigree(screenName);
+				}
 			} catch (TwitterException e) {
 				getStatus(e, "/users/show/");
 			} finally {
@@ -158,7 +167,8 @@ public class TwitterQuery {
 		user.setLevel(level++);
 		for (Status status : result) {
 			if((!status.isRetweet())&&(!status.isRetweeted())) {
-				String json = TwitterObjectFactory.getRawJSON(status);
+//				String json = TwitterObjectFactory.getRawJSON(status);
+				String json = this.gson.toJson(status);
 				if((json!=null)&&(!json.equals("null"))) {
 					System.out.println(json);
 					user.getStatuses().add(json);
@@ -173,10 +183,10 @@ public class TwitterQuery {
 		return user;
 	}
 	
-	private void write(BufferedWriter bw, User user) {
+	private void write(BufferedWriter bw, TwitterUser user) {
 		try {
-			String json = gson.toJson(user);
-			System.out.println(json);
+			String json = gson.toJson(user.getUser());
+			System.out.println("user: " + user.getPedigree());
 			bw.write(json);
 			bw.newLine();
 			bw.flush();
@@ -187,15 +197,6 @@ public class TwitterQuery {
 	}
 	
 	private void processUser(TwitterUser user, int maxLevel, int level, int pages, int count, String parent) {
-		
-//		try {
-//			for(String status:user.getStatuses()) {	
-//				writer.write(status+"\n");
-//			}
-//			writer.flush();
-//		} catch (IOException e) {
-//			e.printStackTrace();
-//		}
 		if(user.getLevel()<maxLevel) {
 			user.setFollowers(this.getFollowers(user.getUser().getScreenName(), pages, count));
 			user.setFriends(this.getFriends(user.getUser().getScreenName(), pages, count));
@@ -209,37 +210,50 @@ public class TwitterQuery {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
-//				write(statusWriter, status+"\n");
 			}
 			closeWriter(statusWriter);
+			
+			//first write friends and followers
 			BufferedWriter followersBw = openWriter("twitter_"+user.getUser().getId()+"_followers.json");
 			for(User follower:user.getFollowers()) {
-				write(followersBw, follower);
-				if(!follower.getScreenName().equals(parent)) {
-					processUser(new TwitterUser(follower), maxLevel, user.getLevel(), pages, count, 
-							user.getUser().getScreenName());
-				}
+				write(followersBw, new TwitterUser(follower, user));
 			}
 			closeWriter(followersBw);
 			BufferedWriter friendsBw = openWriter("twitter_"+user.getUser().getId()+"_friends.json");
 			for(User friend:user.getFriends()) {
-				write(friendsBw, friend);
-				if(!friend.getScreenName().equals(parent)) {
-					processUser(new TwitterUser(friend), maxLevel, user.getLevel(), pages, count, 
-							user.getUser().getScreenName());
-				}
+				write(friendsBw, new TwitterUser(friend, user));
+				
 			}
 			closeWriter(friendsBw);
 			BufferedWriter mentionsBw = openWriter("twitter_"+user.getUser().getId()+"_mentions.json");
 			for(String mention:user.getMentions()) {
-				TwitterUser mentionUser = this.createTwitterUser(mention);
-				write(mentionsBw, mentionUser.getUser());
+				TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree());
+				write(mentionsBw, mentionUser);
+			}
+			closeWriter(mentionsBw);
+			
+			//go back and iterate through friends and followers, processing as you go. 
+			for(User follower:user.getFollowers()) {
+				if(!follower.getScreenName().equals(parent)) {
+					processUser(new TwitterUser(follower, user), maxLevel, user.getLevel(), pages, count, 
+							user.getUser().getScreenName());
+				}
+			}
+
+			for(User friend:user.getFriends()) {
+				if(!friend.getScreenName().equals(parent)) {
+					processUser(new TwitterUser(friend, user), maxLevel, user.getLevel(), pages, count, 
+							user.getUser().getScreenName());
+				}
+			}
+
+			for(String mention:user.getMentions()) {
+				TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree());
 				if(!mention.equals(parent)) {
 					processUser(mentionUser, maxLevel, user.getLevel(), pages, count, 
 							user.getUser().getScreenName());
 				}
 			}
-			closeWriter(mentionsBw);
 		}
 	}
 	
@@ -252,7 +266,6 @@ public class TwitterQuery {
 				file.createNewFile();
 	    	}
 			fw = new FileWriter(file);
-//	    	this.bw = new BufferedWriter(fw);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -268,22 +281,20 @@ public class TwitterQuery {
 	}
 	
 	public void run() {
-//		this.openWriter(this.fileName);
-		TwitterUser user = this.createTwitterUser(this.startingPoint);
+		TwitterUser user = this.createTwitterUser(this.startingPoint, "");
 		BufferedWriter startingPointBw = openWriter("twitter_"+user.getUser().getId()+".json");
-		write(startingPointBw, user.getUser());
+		write(startingPointBw, user);
 		closeWriter(startingPointBw);
-		this.processUser(user, this.maxLevel, 0, 1, this.count, "");
-//		this.closeWriter();
+		this.processUser(user, this.maxLevel, 0, 1000, this.count, "");
 	}
 	
 	
 	public static void main(String[] args) {
 		String startPoint = args[0];
-		int levels = Integer.valueOf(args[1]);
+		int maxLevel = Integer.valueOf(args[1]);
 		String dir = args[2];
 		int count = Integer.valueOf(args[3]);
-		TwitterQuery tw = new TwitterQuery(startPoint, levels, dir, count);
+		TwitterQuery tw = new TwitterQuery(startPoint, maxLevel, dir, count);
 		tw.run();
 	}
 
