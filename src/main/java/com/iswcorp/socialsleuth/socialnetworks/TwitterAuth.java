@@ -1,6 +1,8 @@
 package com.iswcorp.socialsleuth.socialnetworks;
 
+import java.io.FileInputStream;
 import java.util.Map;
+import java.util.Properties;
 
 import twitter4j.AsyncTwitter;
 import twitter4j.AsyncTwitterFactory;
@@ -15,18 +17,27 @@ import twitter4j.User;
 import twitter4j.conf.ConfigurationBuilder;
 
 public abstract class TwitterAuth {
-	public static final String CONSUMER_KEY = "RR6qXq23mPi3BNxVsN8gwzkvm";
-	public static final String CONSUMER_SECRET = "MbuEcZaKKOo8MmAvlvZ2ngmk9qSaXqPY1yRRZ1Mj1orWgJZgJq";
-	public static final String ACCESS_TOKEN = "407790264-5khSqNcRNRU19oqNy0bzzADLFuWY46W3J7EQuhpb";
-	public static final String ACCESS_SECRET = "LlVrRGhlGAgajvQxyKigP5d4dV7GaqCPDYE9nHX6EWJhD";
+//	public static final String CONSUMER_KEY = "RR6qXq23mPi3BNxVsN8gwzkvm";
+//	public static final String CONSUMER_SECRET = "MbuEcZaKKOo8MmAvlvZ2ngmk9qSaXqPY1yRRZ1Mj1orWgJZgJq";
+//	public static final String ACCESS_TOKEN = "407790264-5khSqNcRNRU19oqNy0bzzADLFuWY46W3J7EQuhpb";
+//	public static final String ACCESS_SECRET = "LlVrRGhlGAgajvQxyKigP5d4dV7GaqCPDYE9nHX6EWJhD";
 	
 	private static ConfigurationBuilder getCB() {
+		Properties properties = new Properties();
+		try {
+			properties.load(new FileInputStream("socialsleuth.properties"));
+		} catch (Exception e) {
+			String msg = "Unable to read properties file. Make sure file named "
+					+ "'socialsleuth.properties' exists\n in the same directory this "
+					+ "program is run in.";
+			System.out.println(msg);
+		}
 		ConfigurationBuilder cb = new ConfigurationBuilder();
 		cb.setDebugEnabled(true)
-			.setOAuthConsumerKey(CONSUMER_KEY)
-			.setOAuthConsumerSecret(CONSUMER_SECRET)
-			.setOAuthAccessToken(ACCESS_TOKEN)
-			.setOAuthAccessTokenSecret(ACCESS_SECRET);
+			.setOAuthConsumerKey(properties.getProperty("CONSUMER_KEY"))
+			.setOAuthConsumerSecret(properties.getProperty("CONSUMER_SECRET"))
+			.setOAuthAccessToken(properties.getProperty("ACCESS_TOKEN"))
+			.setOAuthAccessTokenSecret(properties.getProperty("ACCESS_SECRET"));
 		cb.setJSONStoreEnabled(true);
 		
 		return cb;

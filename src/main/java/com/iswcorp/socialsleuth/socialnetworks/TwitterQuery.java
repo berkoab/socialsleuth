@@ -2,25 +2,22 @@ package com.iswcorp.socialsleuth.socialnetworks;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Properties;
 
 import com.google.gson.Gson;
 
-import twitter4j.AsyncTwitter;
-import twitter4j.AsyncTwitterFactory;
 import twitter4j.HttpResponseCode;
 import twitter4j.PagableResponseList;
 import twitter4j.RateLimitStatus;
 import twitter4j.ResponseList;
 import twitter4j.Status;
 import twitter4j.Twitter;
-import twitter4j.TwitterAdapter;
 import twitter4j.TwitterException;
-import twitter4j.TwitterListener;
-import twitter4j.TwitterObjectFactory;
 import twitter4j.User;
 import twitter4j.UserMentionEntity;
 
@@ -152,6 +149,9 @@ public class TwitterQuery {
 					twUser.setPedigree(screenName);
 				}
 			} catch (TwitterException e) {
+				if(e.getErrorCode()==34) {
+					return null;
+				}
 				getStatus(e, "/users/show/");
 			} finally {
 				a = false;
@@ -283,18 +283,36 @@ public class TwitterQuery {
 	
 	public void run() {
 		TwitterUser user = this.createTwitterUser(this.startingPoint, "", 0);
-		BufferedWriter startingPointBw = openWriter("twitter_"+user.getUser().getId()+".json");
-		write(startingPointBw, user, "starting");
-		closeWriter(startingPointBw);
-		this.processUser(user, this.maxLevel, 0, this.count, "");
+		if(user==null) {
+			System.out.println("User does not exist.");
+			
+		} else {
+			BufferedWriter startingPointBw = openWriter("twitter_"+user.getUser().getId()+".json");
+			write(startingPointBw, user, "starting");
+			closeWriter(startingPointBw);
+			this.processUser(user, this.maxLevel, 0, this.count, "");
+		}
 	}
 	
 	
 	public static void main(String[] args) {
-		String startPoint = args[0];
-		int maxLevel = Integer.valueOf(args[1]);
-		String dir = args[2];
-		int count = Integer.valueOf(args[3]);
+		Properties properties = new Properties();
+		try {
+			properties.load(new FileInputStream("socialsleuth.properties"));
+		} catch (Exception e) {
+			String msg = "Unable to read properties file. Make sure file named "
+					+ "'socialsleuth.properties' exists\n in the same directory this "
+					+ "program is run in.";
+			System.out.println(msg);
+		}
+		String startPoint = properties.getProperty("starting_point");
+		int maxLevel = Integer.valueOf(properties.getProperty("max_depth"));
+		String dir = properties.getProperty("output_dir");
+		int count = Integer.valueOf(properties.getProperty("max_count"));
+//		String startPoint = args[0];
+//		int maxLevel = Integer.valueOf(args[1]);
+//		String dir = args[2];
+//		int count = Integer.valueOf(args[3]);
 		TwitterQuery tw = new TwitterQuery(startPoint, maxLevel, dir, count);
 		tw.run();
 	}
