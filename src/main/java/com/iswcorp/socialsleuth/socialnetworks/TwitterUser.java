@@ -16,13 +16,15 @@ public class TwitterUser {
 	
 	public TwitterUser() {}
 	
-	public TwitterUser(User user) {
+	public TwitterUser(User user, int level) {
 		this.user = user;
+		this.level = level;
 	}
 	
-	public TwitterUser(User user, TwitterUser parent) {
+	public TwitterUser(User user, TwitterUser parent, int level) {
 		this.user = user;
 		this.setPedigree(parent.getPedigree() + " <- " + this.user.getScreenName());
+		this.level = level;
 	}
 	
 	public User getUser() {

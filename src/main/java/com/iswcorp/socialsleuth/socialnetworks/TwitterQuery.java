@@ -139,8 +139,9 @@ public class TwitterQuery {
 		return statuses;
 	}
 	
-	private TwitterUser createTwitterUser(String screenName, String pedigree) {
+	private TwitterUser createTwitterUser(String screenName, String pedigree, int level) {
 		TwitterUser twUser = new TwitterUser();
+		twUser.setLevel(level);
 		boolean a = true;
 		while(a) {
 			try {
@@ -159,12 +160,12 @@ public class TwitterQuery {
 		return twUser;
 	}
 	
-	private TwitterUser addStatusesAndMentions(TwitterUser user, int level) {
+	private TwitterUser addStatusesAndMentions(TwitterUser user) {
 		ResponseList<Status> result = getStatuses(user.getUser());
 		if(result==null) {
 			return null;
 		}
-		user.setLevel(level++);
+//		user.setLevel(level++);
 		for (Status status : result) {
 			if((!status.isRetweet())&&(!status.isRetweeted())) {
 //				String json = TwitterObjectFactory.getRawJSON(status);
@@ -183,10 +184,10 @@ public class TwitterQuery {
 		return user;
 	}
 	
-	private void write(BufferedWriter bw, TwitterUser user) {
+	private void write(BufferedWriter bw, TwitterUser user, String type) {
 		try {
 			String json = gson.toJson(user.getUser());
-			System.out.println("user: " + user.getPedigree());
+			System.out.println(type + ": " + user.getPedigree());
 			bw.write(json);
 			bw.newLine();
 			bw.flush();
@@ -196,11 +197,11 @@ public class TwitterQuery {
 		}
 	}
 	
-	private void processUser(TwitterUser user, int maxLevel, int level, int pages, int count, String parent) {
+	private void processUser(TwitterUser user, int maxLevel, int pages, int count, String parent) {
 		if(user.getLevel()<maxLevel) {
 			user.setFollowers(this.getFollowers(user.getUser().getScreenName(), pages, count));
 			user.setFriends(this.getFriends(user.getUser().getScreenName(), pages, count));
-			this.addStatusesAndMentions(user, level);
+			this.addStatusesAndMentions(user);
 			BufferedWriter statusWriter = openWriter("twitter_"+user.getUser().getId()+"_statuses.json");
 			for(String status:user.getStatuses()) {	
 				try {
@@ -216,41 +217,41 @@ public class TwitterQuery {
 			//first write friends and followers
 			BufferedWriter followersBw = openWriter("twitter_"+user.getUser().getId()+"_followers.json");
 			for(User follower:user.getFollowers()) {
-				write(followersBw, new TwitterUser(follower, user));
+				write(followersBw, new TwitterUser(follower, user, user.getLevel()+1), "follower");
 			}
 			closeWriter(followersBw);
 			BufferedWriter friendsBw = openWriter("twitter_"+user.getUser().getId()+"_friends.json");
 			for(User friend:user.getFriends()) {
-				write(friendsBw, new TwitterUser(friend, user));
+				write(friendsBw, new TwitterUser(friend, user, user.getLevel()+1), "friend");
 				
 			}
 			closeWriter(friendsBw);
 			BufferedWriter mentionsBw = openWriter("twitter_"+user.getUser().getId()+"_mentions.json");
 			for(String mention:user.getMentions()) {
-				TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree());
-				write(mentionsBw, mentionUser);
+				TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree(), user.getLevel()+1);
+				write(mentionsBw, mentionUser, "mention");
 			}
 			closeWriter(mentionsBw);
 			
 			//go back and iterate through friends and followers, processing as you go. 
 			for(User follower:user.getFollowers()) {
 				if(!follower.getScreenName().equals(parent)) {
-					processUser(new TwitterUser(follower, user), maxLevel, user.getLevel(), pages, count, 
+					processUser(new TwitterUser(follower, user, user.getLevel()+1), maxLevel, pages, count, 
 							user.getUser().getScreenName());
 				}
 			}
 
 			for(User friend:user.getFriends()) {
 				if(!friend.getScreenName().equals(parent)) {
-					processUser(new TwitterUser(friend, user), maxLevel, user.getLevel(), pages, count, 
+					processUser(new TwitterUser(friend, user, user.getLevel()+1), maxLevel, pages, count, 
 							user.getUser().getScreenName());
 				}
 			}
 
 			for(String mention:user.getMentions()) {
-				TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree());
+				TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree(), user.getLevel()+1);
 				if(!mention.equals(parent)) {
-					processUser(mentionUser, maxLevel, user.getLevel(), pages, count, 
+					processUser(mentionUser, maxLevel, pages, count, 
 							user.getUser().getScreenName());
 				}
 			}
@@ -281,11 +282,11 @@ public class TwitterQuery {
 	}
 	
 	public void run() {
-		TwitterUser user = this.createTwitterUser(this.startingPoint, "");
+		TwitterUser user = this.createTwitterUser(this.startingPoint, "", 0);
 		BufferedWriter startingPointBw = openWriter("twitter_"+user.getUser().getId()+".json");
-		write(startingPointBw, user);
+		write(startingPointBw, user, "starting");
 		closeWriter(startingPointBw);
-		this.processUser(user, this.maxLevel, 0, 1000, this.count, "");
+		this.processUser(user, this.maxLevel, 0, this.count, "");
 	}
 	
 	
