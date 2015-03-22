@@ -1,8 +1,11 @@
 package com.iswcorp.socialsleuth.socialnetworks;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,18 +27,19 @@ import twitter4j.UserMentionEntity;
 public class TwitterQuery {
 	private Twitter twitter = null;
 	private String startingPoint =  null;
-	private int maxLevel;
-//	private BufferedWriter bw;
+	private final int maxLevel;
 	private String dir = null;
-	private int count;
+	private final int count;
+	private final int pages;
 	private Gson gson = null;
 	
-	public TwitterQuery(String startingPoint, int maxLevel, String dir, int count) {
+	public TwitterQuery(String startingPoint, int maxLevel, String dir, int count, int pages) {
 		this.startingPoint = startingPoint;
 		this.twitter = TwitterAuth.createTwitter();
 		this.maxLevel = maxLevel;
 		this.dir = dir;
 		this.count = count;
+		this.pages = pages;
 		this.gson = new Gson();
 	}
 	
@@ -43,7 +47,10 @@ public class TwitterQuery {
 		Map<String, RateLimitStatus> statusMap = null;
 		try {
 			statusMap = twitter.getRateLimitStatus();
-			System.out.println(statusMap);
+//			for(String s:statusMap.keySet()) {
+//				System.out.println(s+ ":" + statusMap.get(s));
+//			}
+//			System.out.println(statusMap);
 		} catch (TwitterException e1) {
 			e1.printStackTrace();
 		}
@@ -149,10 +156,12 @@ public class TwitterQuery {
 					twUser.setPedigree(screenName);
 				}
 			} catch (TwitterException e) {
-				if(e.getErrorCode()==34) {
+//				e.printStackTrace();
+				if(e.getErrorCode()==34 || e.getErrorCode()==63) {
 					return null;
 				}
-				getStatus(e, "/users/show/");
+//				e.printStackTrace();
+				getStatus(e, "/users/show/:id");
 			} finally {
 				a = false;
 			}
@@ -165,13 +174,12 @@ public class TwitterQuery {
 		if(result==null) {
 			return null;
 		}
-//		user.setLevel(level++);
 		for (Status status : result) {
 			if((!status.isRetweet())&&(!status.isRetweeted())) {
 //				String json = TwitterObjectFactory.getRawJSON(status);
 				String json = this.gson.toJson(status);
 				if((json!=null)&&(!json.equals("null"))) {
-					System.out.println(json);
+					System.out.println(user.getUser().getScreenName() + ": " + json);
 					user.getStatuses().add(json);
 				}
 				ArrayList<String> mentions = new ArrayList<String>();
@@ -284,7 +292,7 @@ public class TwitterQuery {
 	public void run() {
 		TwitterUser user = this.createTwitterUser(this.startingPoint, "", 0);
 		if(user==null) {
-			System.out.println("User does not exist.");
+			System.out.println(this.startingPoint + " does not exist or has been suspended.");
 			
 		} else {
 			BufferedWriter startingPointBw = openWriter("twitter_"+user.getUser().getId()+".json");
@@ -305,16 +313,30 @@ public class TwitterQuery {
 					+ "program is run in.";
 			System.out.println(msg);
 		}
-		String startPoint = properties.getProperty("starting_point");
+//		String startPoint = properties.getProperty("starting_point");
 		int maxLevel = Integer.valueOf(properties.getProperty("max_depth"));
 		String dir = properties.getProperty("output_dir");
 		int count = Integer.valueOf(properties.getProperty("max_count"));
-//		String startPoint = args[0];
-//		int maxLevel = Integer.valueOf(args[1]);
-//		String dir = args[2];
-//		int count = Integer.valueOf(args[3]);
-		TwitterQuery tw = new TwitterQuery(startPoint, maxLevel, dir, count);
-		tw.run();
+		int pages = Integer.valueOf(properties.getProperty("pages"));
+		String inputFile = properties.getProperty("input_file");
+		//read in file
+		BufferedReader br = null;
+		try {
+			br = new BufferedReader(new FileReader(new File(inputFile))); 
+			String line = null;  
+			while ((line = br.readLine()) != null)  
+			{  
+				TwitterQuery tw = new TwitterQuery(line, maxLevel, dir, count, pages);
+				tw.run();  
+			}
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
 	}
 
 }
