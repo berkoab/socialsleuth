@@ -237,7 +237,9 @@ public class TwitterQuery {
 			BufferedWriter mentionsBw = openWriter("twitter_"+user.getUser().getId()+"_mentions.json");
 			for(String mention:user.getMentions()) {
 				TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree(), user.getLevel()+1);
-				write(mentionsBw, mentionUser, "mention");
+				if(mentionUser!=null) {
+					write(mentionsBw, mentionUser, "mention");
+				}
 			}
 			closeWriter(mentionsBw);
 			
@@ -258,9 +260,11 @@ public class TwitterQuery {
 
 			for(String mention:user.getMentions()) {
 				TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree(), user.getLevel()+1);
-				if(!mention.equals(parent)) {
-					processUser(mentionUser, maxLevel, pages, count, 
-							user.getUser().getScreenName());
+				if(mentionUser!=null) {
+					if(!mention.equals(parent)) {
+						processUser(mentionUser, maxLevel, pages, count, 
+								user.getUser().getScreenName());
+					}
 				}
 			}
 		}
