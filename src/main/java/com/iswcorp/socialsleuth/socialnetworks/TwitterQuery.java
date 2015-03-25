@@ -8,7 +8,9 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -32,8 +34,10 @@ public class TwitterQuery {
 	private final int count;
 	private final int pages;
 	private Gson gson = null;
+	private List<String> usedScreenNames;
+	private String usedScreenNamesFile;
 	
-	public TwitterQuery(String startingPoint, int maxLevel, String dir, int count, int pages) {
+	public TwitterQuery(String startingPoint, int maxLevel, String dir, int count, int pages, String usedFileName) {
 		this.startingPoint = startingPoint;
 		this.twitter = TwitterAuth.createTwitter();
 		this.maxLevel = maxLevel;
@@ -41,6 +45,13 @@ public class TwitterQuery {
 		this.count = count;
 		this.pages = pages;
 		this.gson = new Gson();
+		try {
+			this.usedScreenNames = this.readLines(usedFileName);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		this.usedScreenNamesFile = usedFileName;
 	}
 	
 	public void getStatus(TwitterException e, String statusOf) {
@@ -206,67 +217,91 @@ public class TwitterQuery {
 	}
 	
 	private void processUser(TwitterUser user, int maxLevel, int pages, int count, String parent) {
-		if(user.getLevel()<maxLevel) {
-			user.setFollowers(this.getFollowers(user.getUser().getScreenName(), pages, count));
-			user.setFriends(this.getFriends(user.getUser().getScreenName(), pages, count));
-			this.addStatusesAndMentions(user);
-			BufferedWriter statusWriter = openWriter("twitter_"+user.getUser().getId()+"_statuses.json");
-			for(String status:user.getStatuses()) {	
-				try {
-					statusWriter.write(status);
-					statusWriter.newLine();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+		if(usedScreenNames.contains(user.getUser().getScreenName())) {
+			System.out.println("We already processed user: " + user.getUser().getScreenName());
+		} else {
+			if(user.getLevel()<maxLevel) {
+				user.setFollowers(this.getFollowers(user.getUser().getScreenName(), pages, count));
+				user.setFriends(this.getFriends(user.getUser().getScreenName(), pages, count));
+				this.addStatusesAndMentions(user);
+				BufferedWriter statusWriter = openWriter("twitter_"+user.getUser().getId()+"_statuses.json");
+				for(String status:user.getStatuses()) {	
+					try {
+						statusWriter.write(status);
+						statusWriter.newLine();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				}
-			}
-			closeWriter(statusWriter);
-			
-			//first write friends and followers
-			BufferedWriter followersBw = openWriter("twitter_"+user.getUser().getId()+"_followers.json");
-			for(User follower:user.getFollowers()) {
-				write(followersBw, new TwitterUser(follower, user, user.getLevel()+1), "follower");
-			}
-			closeWriter(followersBw);
-			BufferedWriter friendsBw = openWriter("twitter_"+user.getUser().getId()+"_friends.json");
-			for(User friend:user.getFriends()) {
-				write(friendsBw, new TwitterUser(friend, user, user.getLevel()+1), "friend");
+				closeWriter(statusWriter);
 				
-			}
-			closeWriter(friendsBw);
-			BufferedWriter mentionsBw = openWriter("twitter_"+user.getUser().getId()+"_mentions.json");
-			for(String mention:user.getMentions()) {
-				TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree(), user.getLevel()+1);
-				if(mentionUser!=null) {
-					write(mentionsBw, mentionUser, "mention");
+				//first write friends and followers
+				BufferedWriter followersBw = openWriter("twitter_"+user.getUser().getId()+"_followers.json");
+				for(User follower:user.getFollowers()) {
+					write(followersBw, new TwitterUser(follower, user, user.getLevel()+1), "follower");
 				}
-			}
-			closeWriter(mentionsBw);
-			
-			//go back and iterate through friends and followers, processing as you go. 
-			for(User follower:user.getFollowers()) {
-				if(!follower.getScreenName().equals(parent)) {
-					processUser(new TwitterUser(follower, user, user.getLevel()+1), maxLevel, pages, count, 
-							user.getUser().getScreenName());
+				closeWriter(followersBw);
+				BufferedWriter friendsBw = openWriter("twitter_"+user.getUser().getId()+"_friends.json");
+				for(User friend:user.getFriends()) {
+					write(friendsBw, new TwitterUser(friend, user, user.getLevel()+1), "friend");
+					
 				}
-			}
-
-			for(User friend:user.getFriends()) {
-				if(!friend.getScreenName().equals(parent)) {
-					processUser(new TwitterUser(friend, user, user.getLevel()+1), maxLevel, pages, count, 
-							user.getUser().getScreenName());
+				closeWriter(friendsBw);
+				BufferedWriter mentionsBw = openWriter("twitter_"+user.getUser().getId()+"_mentions.json");
+				for(String mention:user.getMentions()) {
+					TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree(), user.getLevel()+1);
+					if(mentionUser!=null) {
+						write(mentionsBw, mentionUser, "mention");
+						if(!mention.equals(parent)) {
+							processUser(mentionUser, maxLevel, pages, count, 
+									user.getUser().getScreenName());
+						}
+					} else {
+						writeToUsedFiles(mention);
+					}
 				}
-			}
-
-			for(String mention:user.getMentions()) {
-				TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree(), user.getLevel()+1);
-				if(mentionUser!=null) {
-					if(!mention.equals(parent)) {
-						processUser(mentionUser, maxLevel, pages, count, 
+				closeWriter(mentionsBw);
+				
+				//go back and iterate through friends and followers, processing as you go. 
+				for(User follower:user.getFollowers()) {
+					if(!follower.getScreenName().equals(parent)) {
+						processUser(new TwitterUser(follower, user, user.getLevel()+1), maxLevel, pages, count, 
 								user.getUser().getScreenName());
 					}
 				}
+	
+				for(User friend:user.getFriends()) {
+					if(!friend.getScreenName().equals(parent)) {
+						processUser(new TwitterUser(friend, user, user.getLevel()+1), maxLevel, pages, count, 
+								user.getUser().getScreenName());
+					}
+				}
+	
+//				for(String mention:user.getMentions()) {
+//					TwitterUser mentionUser = this.createTwitterUser(mention, user.getPedigree(), user.getLevel()+1);
+//					if(mentionUser!=null) {
+//						if(!mention.equals(parent)) {
+//							processUser(mentionUser, maxLevel, pages, count, 
+//									user.getUser().getScreenName());
+//						}
+//					} else {
+//						writeToUsedFiles(mention);
+//					}
+//				}
 			}
+			writeToUsedFiles(user.getUser().getScreenName());
+		}
+	}
+	
+	private void writeToUsedFiles(String screenname) {
+		try {
+		    PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(this.usedScreenNamesFile, true)));
+		    out.println(screenname);
+		    out.close();
+		    this.usedScreenNames.add(screenname);
+		} catch (IOException e) {
+		    e.printStackTrace();
 		}
 	}
 	
@@ -294,18 +329,38 @@ public class TwitterQuery {
 	}
 	
 	public void run() {
-		TwitterUser user = this.createTwitterUser(this.startingPoint, "", 0);
-		if(user==null) {
-			System.out.println(this.startingPoint + " does not exist or has been suspended.");
-			
+		if(this.usedScreenNames.contains(this.startingPoint)) {
+			System.out.println(this.startingPoint + " has already been processed.");
 		} else {
-			BufferedWriter startingPointBw = openWriter("twitter_"+user.getUser().getId()+".json");
-			write(startingPointBw, user, "starting");
-			closeWriter(startingPointBw);
-			this.processUser(user, this.maxLevel, 0, this.count, "");
+			TwitterUser user = this.createTwitterUser(this.startingPoint, "", 0);
+			if(user==null) {
+				System.out.println(this.startingPoint + " does not exist or has been suspended.");
+				writeToUsedFiles(this.startingPoint);
+			} else {
+				BufferedWriter startingPointBw = openWriter("twitter_"+user.getUser().getId()+".json");
+				write(startingPointBw, user, "starting");
+				closeWriter(startingPointBw);
+				this.processUser(user, this.maxLevel, 0, this.count, "");
+			}
 		}
 	}
 	
+    public List<String> readLines(String filename) throws IOException  {  
+        FileReader fileReader = new FileReader(filename);  
+          
+        BufferedReader bufferedReader = new BufferedReader(fileReader);  
+        List<String> lines = new ArrayList<String>();  
+        String line = null;  
+          
+        while ((line = bufferedReader.readLine()) != null)   
+        {  
+            lines.add(line);  
+        }  
+          
+        bufferedReader.close();  
+          
+        return lines;  
+    }     
 	
 	public static void main(String[] args) {
 		Properties properties = new Properties();
@@ -323,6 +378,7 @@ public class TwitterQuery {
 		int count = Integer.valueOf(properties.getProperty("max_count"));
 		int pages = Integer.valueOf(properties.getProperty("pages"));
 		String inputFile = properties.getProperty("input_file");
+		String usedFileName = properties.getProperty("used_screennames_filename");
 		//read in file
 		BufferedReader br = null;
 		try {
@@ -330,7 +386,7 @@ public class TwitterQuery {
 			String line = null;  
 			while ((line = br.readLine()) != null)  
 			{  
-				TwitterQuery tw = new TwitterQuery(line, maxLevel, dir, count, pages);
+				TwitterQuery tw = new TwitterQuery(line, maxLevel, dir, count, pages, usedFileName);
 				tw.run();  
 			}
 		} catch (FileNotFoundException e) {
